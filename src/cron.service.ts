@@ -1,44 +1,47 @@
 // cron.service.ts
 
 import { Injectable } from '@nestjs/common';
-import * as cron from 'node-cron';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import * as https from 'https';
 
 @Injectable()
 export class CronService {
-  constructor() {
-    // Schedule the cron job in the constructor
-    this.schedulePing();
+  constructor() {}
+
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async handleCron() {
+    try {
+      await this.pingServer();
+      console.log('Pinging server to keep it alive...');
+    } catch (error) {
+      console.error('Error pinging server:', error.message);
+    }
   }
 
-  private schedulePing() {
-    cron.schedule('*/1 * * * *', () => {
-      this.pingServer();
+  private pingServer(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const options = {
+        hostname: 'jcyclebackend.onrender.com',
+        method: 'GET',
+        timeout: 60000,
+      };
+
+      const req = https.request(options, (res) => {
+        console.log(`Ping response: ${res.statusCode}`);
+        resolve();
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timed out'));
+      });
+
+      req.on('error', (err) => {
+        console.error('Ping error:', err.message);
+        reject(err);
+      });
+
+      req.end();
     });
-  }
-
-  private pingServer() {
-    console.log('Pinging server to keep it alive...');
-
-    const options = {
-      hostname: 'feeton.onrender.com',
-      method: 'GET',
-      timeout: 60000,
-    };
-
-    const req = https.request(options, (res) => {
-      console.log(`Ping response: ${res.statusCode}`);
-    });
-
-    req.on('timeout', () => {
-      req.destroy();
-      console.error('Request timed out');
-    });
-
-    req.on('error', (err) => {
-      console.error('Ping error:', err.message);
-    });
-
-    req.end();
   }
 }
